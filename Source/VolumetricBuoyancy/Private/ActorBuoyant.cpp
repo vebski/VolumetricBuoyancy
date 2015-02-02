@@ -22,6 +22,17 @@ void AActorBuoyant::BeginPlay()
 	Super::BeginPlay();
 
 	BuoyancyData.BodyVolume = UBuoyancyHelper::ComputeVolume(BuoyantMesh, BuoyancyData.LocalCentroidOfVolume);
+
+	// Save old rotation and zero it so we can get actual extent
+	// @FIXME: Move this to some function, best place would be inside ComouteVolume
+	FRotator OldRot = BuoyantMesh->GetComponentRotation();
+	BuoyantMesh->SetWorldRotation(FRotator(0.0f, 0.0f, 0.0f));
+
+	FVector TrueExtent = BuoyantMesh->Bounds.GetBox().GetExtent();
+	BuoyancyData.BodyLengthX = TrueExtent.X + TrueExtent.X;
+
+	// Set back old rotation
+	BuoyantMesh->SetWorldRotation(OldRot);
 }
 
 void AActorBuoyant::Tick(float DeltaSeconds)

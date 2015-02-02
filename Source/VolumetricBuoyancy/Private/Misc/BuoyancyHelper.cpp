@@ -127,13 +127,12 @@ void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyan
 
 	// @TODO: Move to actor tick and add local center offset to BuoyantData
 	DrawDebugSphere(BuoyantMesh->GetWorld(), SubmergedCentroid, 8.0f, 8, FColor::Blue);
-	GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, SubmergedCentroid.ToString());
 
 	if (SubmergedVolume < 0)
 	{
 		const float WaterDensity = 0.0001f; // 1g/cm^3 -> 1000kg/m^3
 		const float WaterLinearDrag = 50000.0f;
-		const float WaterAngularDrag = 5000.0f;
+		const float WaterAngularDrag = 500.0f;
 		const FVector WaterVelocity = FVector::ZeroVector;
 		const FVector PlaneNormal = FVector::UpVector;
 		const FVector PlaneLocation = FVector::ZeroVector;
@@ -146,29 +145,22 @@ void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyan
 		FVector BuoyantForce = (WaterDensity * SubmergedVolume * BuoyantMesh->GetWorld()->GetGravityZ()) * PlaneNormal;
 		float PartialMass = VolumeMass * SubmergedVolume / BuoyantData.BodyVolume;
 		FVector Rc = SubmergedCentroid - BuoyantMesh->GetCenterOfMass();
-		FVector Vc = BuoyantMesh->GetPhysicsLinearVelocity() + FVector::CrossProduct(BuoyantMesh->GetPhysicsAngularVelocity(), Rc);
+		FVector Vc = (BuoyantMesh->GetPhysicsLinearVelocity() / 1.0f) + FVector::CrossProduct((BuoyantMesh->GetPhysicsAngularVelocity() / 1000.0f), Rc);
 		FVector DragForce = (PartialMass * WaterLinearDrag) * (WaterVelocity - Vc);
 
-		FVector TotalForce = BuoyantForce + DragForce;
+		FVector TotalForce = BuoyantForce +DragForce;
 		BuoyantMesh->AddForceAtLocation(TotalForce, SubmergedCentroid);
 
 		FVector TotalDrag = FVector::CrossProduct(Rc, TotalForce);
 		BuoyantMesh->AddTorque(TotalDrag);
 
-		// Save old rotation and zero it so we can get actual extent
-		// @FIXME: Move this to BeginPlay and save in BuoyantData!
-		FRotator OldRot = BuoyantMesh->GetComponentRotation();
-		BuoyantMesh->SetWorldRotation(FRotator(0.0f, 0.0f, 0.0f));
+		// @FIXME: We don't need to calculate Length2 every Tick, move it to structure
+		float Length2 = BuoyantData.BodyLengthX * BuoyantData.BodyLengthX;
 
-		FVector TrueExtent = BuoyantMesh->Bounds.GetBox().GetExtent();
-		float Length = TrueExtent.X + TrueExtent.X;
-
-		// Set back old rotation
-		BuoyantMesh->SetWorldRotation(OldRot);
-
-		float Length2 = Length * Length;
 		FVector DragTorque = (-PartialMass * WaterAngularDrag * Length2) * BuoyantMesh->GetPhysicsAngularVelocity();
-		//BuoyantMesh->AddTorque(DragTorque);
+		BuoyantMesh->AddTorque(DragTorque);
+
+		//GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "DragTorque: " + DragTorque.ToString() + "TotalDrag: " + TotalDrag.ToString());
 	}
 }
 

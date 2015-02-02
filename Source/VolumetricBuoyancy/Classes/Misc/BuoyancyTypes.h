@@ -4,7 +4,7 @@
 
 #include "BuoyancyTypes.generated.h"
 
-USTRUCT()
+USTRUCT(BlueprintType, Blueprintable)
 struct FBuoyantBodyData
 {
 	GENERATED_USTRUCT_BODY()
@@ -23,10 +23,15 @@ struct FBuoyantBodyData
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Buoyancy)
 	float DensityOfBody;
 
+	/* Length of body along X axis */
+	UPROPERTY()
+	float BodyLengthX;
+
 	FBuoyantBodyData()
 	{
 		BodyVolume = 0.0f;
 		LocalCentroidOfVolume = FVector::ZeroVector;
 		DensityOfBody = 500.0f;
+		BodyLengthX = 0.0f;
 	}
 };
