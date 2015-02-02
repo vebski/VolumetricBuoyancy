@@ -127,6 +127,7 @@ void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyan
 
 	// @TODO: Move to actor tick and add local center offset to BuoyantData
 	DrawDebugSphere(BuoyantMesh->GetWorld(), SubmergedCentroid, 8.0f, 8, FColor::Blue);
+	GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, SubmergedCentroid.ToString());
 
 	if (SubmergedVolume < 0)
 	{
@@ -152,7 +153,7 @@ void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyan
 		BuoyantMesh->AddForceAtLocation(TotalForce, SubmergedCentroid);
 
 		FVector TotalDrag = FVector::CrossProduct(Rc, TotalForce);
-		//BuoyantMesh->AddTorque(TotalDrag);
+		BuoyantMesh->AddTorque(TotalDrag);
 
 		// Save old rotation and zero it so we can get actual extent
 		// @FIXME: Move this to BeginPlay and save in BuoyantData!
@@ -261,7 +262,7 @@ float UBuoyancyHelper::ComputeSubmergedVolume(UStaticMeshComponent* BuoyantMesh,
 	}
 
 	Centroid *= 1.0f / Volume;
-	Centroid = Centroid + BuoyantMesh->GetCenterOfMass() + BuoyantMesh->GetComponentRotation().Quaternion().RotateVector(Centroid);
+	Centroid = BuoyantMesh->GetCenterOfMass() + BuoyantMesh->GetComponentRotation().Quaternion().RotateVector(Centroid);
 
 	return Volume;
 }
