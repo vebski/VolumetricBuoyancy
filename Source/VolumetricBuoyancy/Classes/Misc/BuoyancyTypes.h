@@ -17,9 +17,16 @@ struct FBuoyantBodyData
 	UPROPERTY()
 	FVector LocalCentroidOfVolume;
 
+	/* Density of body, it must be lower for body to float on surface.
+	 *	1000.0f -> Density of water (1000kg/m^3)
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Buoyancy)
+	float DensityOfBody;
+
 	FBuoyantBodyData()
 	{
 		BodyVolume = 0.0f;
 		LocalCentroidOfVolume = FVector::ZeroVector;
+		DensityOfBody = 500.0f;
 	}
 };

@@ -130,14 +130,17 @@ void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyan
 
 	if (SubmergedVolume < 0)
 	{
-		const float WaterDensity = 0.001f; // 1g/cm^3 -> 1000kg/m^3
+		const float WaterDensity = 0.0001f; // 1g/cm^3 -> 1000kg/m^3
 		const float WaterLinearDrag = 50000.0f;
 		const float WaterAngularDrag = 5000.0f;
 		const FVector WaterVelocity = FVector::ZeroVector;
 		const FVector PlaneNormal = FVector::UpVector;
 		const FVector PlaneLocation = FVector::ZeroVector;
 
-		float VolumeMass = 0.0005f * BuoyantMesh->GetMass();
+		float VolumeMass = (BuoyantData.DensityOfBody * 0.0000001f) * BuoyantMesh->GetMass();
+
+		/* You can use this crazy version, but I prefer one above since it gives us 2 variables we can control (and it dosen't have 10 freaking zeros ;) ) */
+		//float VolumeMass = FMath::Abs((BuoyantData.DensityOfBody * 0.00000000001f * BuoyantData.BodyVolume) * 0.5f);
 
 		FVector BuoyantForce = (WaterDensity * SubmergedVolume * BuoyantMesh->GetWorld()->GetGravityZ()) * PlaneNormal;
 		float PartialMass = VolumeMass * SubmergedVolume / BuoyantData.BodyVolume;
@@ -146,8 +149,8 @@ void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyan
 		FVector DragForce = (PartialMass * WaterLinearDrag) * (WaterVelocity - Vc);
 
 		FVector TotalForce = BuoyantForce + DragForce;
-		BuoyantMesh->AddForceAtLocation(TotalForce * 0.2115f, SubmergedCentroid);
-		//BuoyantMesh->AddForce(TotalForce); // * 0.2115f
+		BuoyantMesh->AddForceAtLocation(TotalForce, SubmergedCentroid);
+
 		FVector TotalDrag = FVector::CrossProduct(Rc, TotalForce);
 		//BuoyantMesh->AddTorque(TotalDrag);
 
