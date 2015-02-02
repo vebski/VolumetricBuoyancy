@@ -1,0 +1,7 @@
+/Binaries
+/DerivedDataCache
+/Intermediate
+/Saved
+*.pdb
+*.sdf
+Config/DefaultEditorUserSettings.ini

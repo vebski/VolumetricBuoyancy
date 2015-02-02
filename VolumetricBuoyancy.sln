@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VolumetricBuoyancy", "Intermediate\ProjectFiles\VolumetricBuoyancy.vcxproj", "{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		DebugGame Editor|Android = DebugGame Editor|Android
+		DebugGame Editor|Windows = DebugGame Editor|Windows
+		DebugGame|Android = DebugGame|Android
+		DebugGame|Windows = DebugGame|Windows
+		Development Editor|Android = Development Editor|Android
+		Development Editor|Windows = Development Editor|Windows
+		Development|Android = Development|Android
+		Development|Windows = Development|Windows
+		Shipping|Android = Shipping|Android
+		Shipping|Windows = Shipping|Windows
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.DebugGame Editor|Android.ActiveCfg = Development_Game|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.DebugGame Editor|Windows.ActiveCfg = DebugGame_Editor|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.DebugGame Editor|Windows.Build.0 = DebugGame_Editor|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.DebugGame|Android.ActiveCfg = Android_DebugGame_Game|Win32
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.DebugGame|Android.Build.0 = Android_DebugGame_Game|Win32
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.DebugGame|Windows.ActiveCfg = DebugGame_Game|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.DebugGame|Windows.Build.0 = DebugGame_Game|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Development Editor|Android.ActiveCfg = Development_Game|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Development Editor|Windows.ActiveCfg = Development_Editor|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Development Editor|Windows.Build.0 = Development_Editor|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Development|Android.ActiveCfg = Android_Development_Game|Win32
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Development|Android.Build.0 = Android_Development_Game|Win32
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Development|Windows.ActiveCfg = Development_Game|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Development|Windows.Build.0 = Development_Game|x64
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Shipping|Android.ActiveCfg = Android_Shipping_Game|Win32
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Shipping|Android.Build.0 = Android_Shipping_Game|Win32
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Shipping|Windows.ActiveCfg = Shipping_Game|Win32
+		{9A290E14-0A94-429D-ADAA-DB2DBE72B5C9}.Shipping|Windows.Build.0 = Shipping_Game|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+	EndGlobalSection
+EndGlobal
