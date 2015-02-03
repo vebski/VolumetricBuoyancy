@@ -52,6 +52,62 @@ float UBuoyancyHelper::ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FV
 	return Volume;
 }
 
+void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData)
+{
+	if (!BuoyantMesh || !BuoyantMesh->StaticMesh || !BuoyantMesh->StaticMesh->RenderData)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Buoyant mesh data is not correct!");
+
+		return;
+	}
+
+	if (BuoyantMesh->StaticMesh->RenderData->LODResources.Num() <= 0)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Buoyant mesh has no LOD Resources!");
+
+		return;
+	}
+
+	FVector SubmergedCentroid = FVector::ZeroVector;
+	float SubmergedVolume = ComputeSubmergedVolume(BuoyantMesh, SubmergedCentroid);
+
+	// @TODO: Move to actor tick and add local center offset to BuoyantData
+	DrawDebugSphere(BuoyantMesh->GetWorld(), SubmergedCentroid, 8.0f, 8, FColor::Blue);
+
+	if (SubmergedVolume < 0)
+	{
+		const float WaterDensity = 0.0001f; // 1g/cm^3 -> 1000kg/m^3
+		const float WaterLinearDrag = 50000.0f;
+		const float WaterAngularDrag = 500.0f;
+		const FVector WaterVelocity = FVector::ZeroVector;
+		const FVector PlaneNormal = FVector::UpVector;
+		const FVector PlaneLocation = FVector::ZeroVector;
+
+		float VolumeMass = (BuoyantData.DensityOfBody * 0.0000001f) * BuoyantMesh->GetMass();
+
+		/* You can use this crazy version, but I prefer one above since it gives us 2 variables we can control (and it dosen't have 10 freaking zeros ;) ) */
+		//float VolumeMass = FMath::Abs((BuoyantData.DensityOfBody * 0.00000000001f * BuoyantData.BodyVolume) * 0.5f);
+
+		FVector BuoyantForce = (WaterDensity * SubmergedVolume * BuoyantMesh->GetWorld()->GetGravityZ()) * PlaneNormal;
+		float PartialMass = VolumeMass * SubmergedVolume / BuoyantData.BodyVolume;
+		FVector Rc = SubmergedCentroid - BuoyantMesh->GetCenterOfMass();
+		FVector Vc = BuoyantMesh->GetPhysicsLinearVelocity() + FVector::CrossProduct((BuoyantMesh->GetPhysicsAngularVelocity() * 0.0001f), Rc);
+		FVector DragForce = (PartialMass * WaterLinearDrag) * (WaterVelocity - Vc);
+
+		FVector TotalForce = BuoyantForce + DragForce;
+		BuoyantMesh->AddForceAtLocation(TotalForce, SubmergedCentroid);
+
+		FVector TotalDrag = FVector::CrossProduct(Rc, TotalForce);
+		BuoyantMesh->AddTorque(TotalDrag);
+
+		// @FIXME: We don't need to calculate Length2 every Tick, move it to structure
+		float Length2 = BuoyantData.BodyLengthX * BuoyantData.BodyLengthX;
+
+		FVector DragTorque = (-PartialMass * WaterAngularDrag * Length2) * BuoyantMesh->GetPhysicsAngularVelocity();
+		BuoyantMesh->AddTorque(DragTorque);
+	}
+}
+
 float UBuoyancyHelper::ComputeTetrahedronVolume(FVector& Center, FVector Point, FVector Vertex1, FVector Vertex2, FVector Vertex3)
 {
 	FVector A = Vertex2 - Vertex1;
@@ -104,64 +160,6 @@ float UBuoyancyHelper::ClipTriangle(FVector& Center, FVector Point, FVector Vert
 	}
 
 	return Volume;
-}
-
-void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData)
-{
-	if (!BuoyantMesh || !BuoyantMesh->StaticMesh || !BuoyantMesh->StaticMesh->RenderData)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Buoyant mesh data is not correct!");
-
-		return;
-	}
-
-	if (BuoyantMesh->StaticMesh->RenderData->LODResources.Num() <= 0)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Buoyant mesh has no LOD Resources!");
-
-		return;
-	}
-
-	FVector SubmergedCentroid = FVector::ZeroVector;
-	float SubmergedVolume = ComputeSubmergedVolume(BuoyantMesh, SubmergedCentroid);
-
-	// @TODO: Move to actor tick and add local center offset to BuoyantData
-	DrawDebugSphere(BuoyantMesh->GetWorld(), SubmergedCentroid, 8.0f, 8, FColor::Blue);
-
-	if (SubmergedVolume < 0)
-	{
-		const float WaterDensity = 0.0001f; // 1g/cm^3 -> 1000kg/m^3
-		const float WaterLinearDrag = 50000.0f;
-		const float WaterAngularDrag = 500.0f;
-		const FVector WaterVelocity = FVector::ZeroVector;
-		const FVector PlaneNormal = FVector::UpVector;
-		const FVector PlaneLocation = FVector::ZeroVector;
-
-		float VolumeMass = (BuoyantData.DensityOfBody * 0.0000001f) * BuoyantMesh->GetMass();
-
-		/* You can use this crazy version, but I prefer one above since it gives us 2 variables we can control (and it dosen't have 10 freaking zeros ;) ) */
-		//float VolumeMass = FMath::Abs((BuoyantData.DensityOfBody * 0.00000000001f * BuoyantData.BodyVolume) * 0.5f);
-
-		FVector BuoyantForce = (WaterDensity * SubmergedVolume * BuoyantMesh->GetWorld()->GetGravityZ()) * PlaneNormal;
-		float PartialMass = VolumeMass * SubmergedVolume / BuoyantData.BodyVolume;
-		FVector Rc = SubmergedCentroid - BuoyantMesh->GetCenterOfMass();
-		FVector Vc = (BuoyantMesh->GetPhysicsLinearVelocity() / 1.0f) + FVector::CrossProduct((BuoyantMesh->GetPhysicsAngularVelocity() / 1000.0f), Rc);
-		FVector DragForce = (PartialMass * WaterLinearDrag) * (WaterVelocity - Vc);
-
-		FVector TotalForce = BuoyantForce +DragForce;
-		BuoyantMesh->AddForceAtLocation(TotalForce, SubmergedCentroid);
-
-		FVector TotalDrag = FVector::CrossProduct(Rc, TotalForce);
-		BuoyantMesh->AddTorque(TotalDrag);
-
-		// @FIXME: We don't need to calculate Length2 every Tick, move it to structure
-		float Length2 = BuoyantData.BodyLengthX * BuoyantData.BodyLengthX;
-
-		FVector DragTorque = (-PartialMass * WaterAngularDrag * Length2) * BuoyantMesh->GetPhysicsAngularVelocity();
-		BuoyantMesh->AddTorque(DragTorque);
-
-		//GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "DragTorque: " + DragTorque.ToString() + "TotalDrag: " + TotalDrag.ToString());
-	}
 }
 
 float UBuoyancyHelper::ComputeSubmergedVolume(UStaticMeshComponent* BuoyantMesh, FVector& Centroid)
