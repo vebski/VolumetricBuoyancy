@@ -52,7 +52,7 @@ float UBuoyancyHelper::ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FV
 	return Volume;
 }
 
-void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData)
+void UBuoyancyHelper::ComputeBuoyancy(AOceanManager* OceanManager,  UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData)
 {
 	if (!BuoyantMesh || !BuoyantMesh->StaticMesh || !BuoyantMesh->StaticMesh->RenderData)
 	{
@@ -68,8 +68,15 @@ void UBuoyancyHelper::ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyan
 		return;
 	}
 
+	if (!OceanManager)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Ocean manager is NULL!");
+
+		return;
+	}
+
 	FVector SubmergedCentroid = FVector::ZeroVector;
-	float SubmergedVolume = ComputeSubmergedVolume(BuoyantMesh, SubmergedCentroid);
+	float SubmergedVolume = ComputeSubmergedVolume(OceanManager, BuoyantMesh, SubmergedCentroid, BuoyantData);
 
 	// @TODO: Move to actor tick and add local center offset to BuoyantData
 	DrawDebugSphere(BuoyantMesh->GetWorld(), SubmergedCentroid, 8.0f, 8, FColor::Blue);
@@ -162,11 +169,13 @@ float UBuoyancyHelper::ClipTriangle(FVector& Center, FVector Point, FVector Vert
 	return Volume;
 }
 
-float UBuoyancyHelper::ComputeSubmergedVolume(UStaticMeshComponent* BuoyantMesh, FVector& Centroid)
+float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FVector& Centroid, FBuoyantBodyData& BuoyantData)
 {
 	 //Temp units simulating Plane, exchange with DynamicWater data when 'Best fit plane' ready
 	FVector PlaneNormal = FVector::UpVector;
 	FVector PlaneLocation = FVector::ZeroVector;
+
+	FClippingPlane ClippingPlane = ClaculateClippingPlane(OceanManager, BuoyantMesh, BuoyantData);
 
 	FQuat Qt = BuoyantMesh->GetComponentRotation().Quaternion().Inverse();
 	FVector Normal = Qt.RotateVector(PlaneNormal);
@@ -255,4 +264,27 @@ float UBuoyancyHelper::ComputeSubmergedVolume(UStaticMeshComponent* BuoyantMesh,
 	Centroid = BuoyantMesh->GetCenterOfMass() + BuoyantMesh->GetComponentRotation().Quaternion().RotateVector(Centroid);
 
 	return Volume;
+}
+
+FClippingPlane UBuoyancyHelper::ClaculateClippingPlane(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData)
+{
+	TArray<FVector> CurrentClippingPoints = BuoyantData.ClippingPointsOffsets;
+	GetTransformedTestPoints(OceanManager, BuoyantMesh, CurrentClippingPoints, BuoyantData);
+
+	FClippingPlane ClippingPlane;
+
+	return ClippingPlane;
+}
+
+void UBuoyancyHelper::GetTransformedTestPoints(AOceanManager* OcanManager, UStaticMeshComponent* BuoyantMesh, TArray<FVector>& ClippingPoints, FBuoyantBodyData& BuoyantData)
+{
+	int32 i = 0;
+	for (i; i < ClippingPoints.Num(); ++i)
+	{
+		ClippingPoints[i] += BuoyantMesh->GetComponentLocation();
+
+		ClippingPoints[i] = BuoyantMesh->GetComponentRotation().RotateVector(ClippingPoints[i] - BuoyantMesh->GetComponentLocation()) + BuoyantMesh->GetComponentLocation();
+
+		DrawDebugSphere(BuoyantMesh->GetWorld(), ClippingPoints[i], 50.0f, 16, FColor::Red);
+	}
 }

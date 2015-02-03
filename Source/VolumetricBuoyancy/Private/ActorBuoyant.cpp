@@ -21,7 +21,10 @@ void AActorBuoyant::BeginPlay()
 {
 	Super::BeginPlay();
 
+	CurrentOceanManager = FindOceanManager();
+
 	BuoyancyData.BodyVolume = UBuoyancyHelper::ComputeVolume(BuoyantMesh, BuoyancyData.LocalCentroidOfVolume);
+	SetClippingTestPoints(BuoyancyData.ClippingPointsOffsets);
 
 	// Save old rotation and zero it so we can get actual extent
 	// @FIXME: Move this to some function, best place would be inside ComouteVolume
@@ -39,9 +42,12 @@ void AActorBuoyant::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	UBuoyancyHelper::ComputeBuoyancy(BuoyantMesh, BuoyancyData);
+	if (CurrentOceanManager->IsValidLowLevel())
+	{
+		UBuoyancyHelper::ComputeBuoyancy(CurrentOceanManager, BuoyantMesh, BuoyancyData);
 
-	DrawDebugHelpers();
+		DrawDebugHelpers();
+	}
 }
 
 void AActorBuoyant::DrawDebugHelpers()
@@ -60,6 +66,48 @@ void AActorBuoyant::DrawDebugHelpers()
 UStaticMeshComponent* AActorBuoyant::GetBuoyantMesh() const
 {
 	return BuoyantMesh;
+}
+
+AOceanManager* AActorBuoyant::FindOceanManager()
+{
+	TActorIterator<AOceanManager> ActorItr(GetWorld());
+
+	for (ActorItr; ActorItr; ++ActorItr)
+	{
+		AOceanManager* TempOceanManager = Cast<AOceanManager>(*ActorItr);
+
+		if (TempOceanManager->IsValidLowLevel())
+		{
+			return TempOceanManager;
+		}
+	}
+
+	GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Can't find ocean manager on level!");
+
+	return NULL;
+}
+
+void AActorBuoyant::SetClippingTestPoints(TArray<FVector>& ClippingPoints)
+{
+	// Save old rotation and zero it so we can get actual extent
+	FRotator OldRot = BuoyantMesh->GetComponentRotation();
+	BuoyantMesh->SetWorldRotation(FRotator(0.0f, 0.0f, 0.0f));
+
+	FVector TrueExtent = BuoyantMesh->Bounds.GetBox().GetExtent();
+
+	// Set back old rotation
+	BuoyantMesh->SetWorldRotation(OldRot);
+
+	//Select 8 points from extent + Center
+	ClippingPoints.Add(FVector(TrueExtent.X, -TrueExtent.Y, 0.0f));	// Front Left
+	ClippingPoints.Add(FVector(TrueExtent.X, 0.0f, 0.0f));			// Front Middle
+	ClippingPoints.Add(FVector(TrueExtent.X, TrueExtent.Y, 0.0f));	// Front Right
+	ClippingPoints.Add(FVector(0.0f, -TrueExtent.Y, 0.0f));			// Center Left
+	ClippingPoints.Add(FVector(0.0f, 0.0f, 0.0f));					// Center Middle
+	ClippingPoints.Add(FVector(0.0f, TrueExtent.Y, 0.0f));			// Center Right
+	ClippingPoints.Add(FVector(-TrueExtent.X, -TrueExtent.Y, 0.0f));// Back Left
+	ClippingPoints.Add(FVector(-TrueExtent.X, 0.0f, 0.0f));			// Back Middle
+	ClippingPoints.Add(FVector(-TrueExtent.X, TrueExtent.Y, 0.0f)); // Back Right
 }
 
 

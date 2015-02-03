@@ -5,6 +5,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "StaticMeshResources.h"
 #include "Misc/BuoyancyTypes.h"
+#include "Ocean/OceanManager.h"
 #include "BuoyancyHelper.generated.h"
 
 /**
@@ -24,10 +25,11 @@ public:
 	static float ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FVector& VolumeCentroid);
 
 	/* Calculate and apply buoyancy
+	*	@param OceanManager				Current ocean manager on level
 	*	@param BuoyantMesh				Mesh for calculation
 	*	@param BuoyantData				Data about body
 	*/
-	static void ComputeBuoyancy(UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData);
+	static void ComputeBuoyancy(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData);
 
 private:
 
@@ -36,8 +38,18 @@ private:
 	static float ClipTriangle(FVector& Center, FVector Point, FVector Vertex1, FVector Vertex2, FVector Vertex3, float Depth1, float Depth2, float Depth3);
 
 	/* Calculate submerged volume of body
+	*	@param OceanManager				Current ocean manager on level
 	*	@param BuoyantMesh				Mesh for calculation
 	*	@param Centroid		(out)		Center of calculated volume
 	*/
-	static float ComputeSubmergedVolume(UStaticMeshComponent* BuoyantMesh, FVector& Centroid);
+	static float ComputeSubmergedVolume(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FVector& Centroid, FBuoyantBodyData& BuoyantData);
+
+	static FClippingPlane ClaculateClippingPlane(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData);
+
+	/* Calculate clipping points for 'Best fit plane' for extends of mesh
+	*	@param OceanManager				Current ocean manager on level
+	*	@param BuoyantMesh				Mesh for calculation
+	*	@param ClippingPoints	(out)	Calculated clipping points
+	*/
+	static void GetTransformedTestPoints(AOceanManager* OcanManager, UStaticMeshComponent* BuoyantMesh, TArray<FVector>& ClippingPoints, FBuoyantBodyData& BuoyantData);
 };

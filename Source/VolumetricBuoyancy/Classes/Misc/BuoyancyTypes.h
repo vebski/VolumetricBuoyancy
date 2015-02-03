@@ -27,11 +27,35 @@ struct FBuoyantBodyData
 	UPROPERTY()
 	float BodyLengthX;
 
+	UPROPERTY()
+	TArray<FVector> ClippingPointsOffsets;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Buoyancy)
+	TArray<FVector> ClippingPointsTransformed;
+
 	FBuoyantBodyData()
 	{
 		BodyVolume = 0.0f;
 		LocalCentroidOfVolume = FVector::ZeroVector;
 		DensityOfBody = 500.0f;
 		BodyLengthX = 0.0f;
+	}
+};
+
+USTRUCT()
+struct FClippingPlane
+{
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY()
+	FVector PlaneNormal;
+
+	UPROPERTY()
+	FVector PlaneLocation;
+
+	FClippingPlane()
+	{
+		PlaneNormal = FVector::ZeroVector;
+		PlaneLocation = FVector::ZeroVector;
 	}
 };

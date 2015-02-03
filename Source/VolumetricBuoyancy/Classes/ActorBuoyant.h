@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "Misc/BuoyancyTypes.h"
 #include "Misc/BuoyancyHelper.h"
+#include "Ocean/OceanManager.h"
 #include "ActorBuoyant.generated.h"
 
 /**
@@ -20,6 +21,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Buoyancy)
 	bool bDrawBuoyancyDebug;
 
+	/* Current ocean manager on the level */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Buoyancy)
+	AOceanManager* CurrentOceanManager;
+
 	AActorBuoyant(const FObjectInitializer& ObjectInitializer);
 
 	/* Buoyant mesh we use to calculate buoyancy for actor. It should have low amount of vertices.
@@ -33,6 +38,10 @@ protected:
 	FBuoyantBodyData BuoyancyData;
 
 	virtual void DrawDebugHelpers();
+
+	virtual AOceanManager* FindOceanManager();
+
+	virtual void SetClippingTestPoints(TArray<FVector>& ClippingPoints);
 
 public:
 	
