@@ -51,5 +51,5 @@ private:
 	*	@param BuoyantMesh				Mesh for calculation
 	*	@param ClippingPoints	(out)	Calculated clipping points
 	*/
-	static void GetTransformedTestPoints(AOceanManager* OcanManager, UStaticMeshComponent* BuoyantMesh, TArray<FVector>& ClippingPoints, FBuoyantBodyData& BuoyantData);
+	static void GetTransformedTestPoints(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, TArray<FVector>& ClippingPoints, FBuoyantBodyData& BuoyantData);
 };

@@ -15,6 +15,7 @@ AActorBuoyant::AActorBuoyant(const FObjectInitializer& ObjectInitializer)
 	BuoyantMesh->SetVisibility(false);
 	BuoyantMesh->SetSimulatePhysics(true);
 	BuoyantMesh->SetPhysicsMaxAngularVelocity(1500.0f);
+	
 }
 
 void AActorBuoyant::BeginPlay()
@@ -24,6 +25,7 @@ void AActorBuoyant::BeginPlay()
 	CurrentOceanManager = FindOceanManager();
 
 	BuoyancyData.BodyVolume = UBuoyancyHelper::ComputeVolume(BuoyantMesh, BuoyancyData.LocalCentroidOfVolume);
+	
 	SetClippingTestPoints(BuoyancyData.ClippingPointsOffsets);
 
 	// Save old rotation and zero it so we can get actual extent
@@ -36,6 +38,8 @@ void AActorBuoyant::BeginPlay()
 
 	// Set back old rotation
 	BuoyantMesh->SetWorldRotation(OldRot);
+
+	
 }
 
 void AActorBuoyant::Tick(float DeltaSeconds)

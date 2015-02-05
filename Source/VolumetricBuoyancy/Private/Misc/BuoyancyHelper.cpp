@@ -1,6 +1,10 @@
 // Implementation created by David 'vebski' Niemiec
 
 #include "VolumetricBuoyancy.h"
+#include "PhysicsPublic.h"
+#include "PhysXIncludes.h"
+#include "ThirdParty/PhysX/PhysX-3.3/include/geometry/PxTriangleMesh.h"
+#include "ThirdParty/PhysX/PhysX-3.3/include/foundation/PxSimpleTypes.h"
 #include "Misc/BuoyancyHelper.h"
 
 float UBuoyancyHelper::ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FVector& VolumeCentroid)
@@ -12,38 +16,48 @@ float UBuoyancyHelper::ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FV
 		return 0.0f;
 	}
 
-	if (BuoyantMesh->StaticMesh->RenderData->LODResources.Num() <= 0)
+	PxTriangleMesh* TempTriMesh = BuoyantMesh->BodyInstance.BodySetup.Get()->TriMesh;
+
+	if (TempTriMesh->getNbTriangles() <= 0)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Buoyant mesh has no LOD Resources!");
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Mesh has 0 triangles!");
 
 		return 0.0f;
 	}
 
-	FStaticMeshLODResources* LODResource = &BuoyantMesh->StaticMesh->RenderData->LODResources[0];
+	int32 TriNumber = TempTriMesh->getNbTriangles();
+
+	const PxVec3* PVertices = TempTriMesh->getVertices();
+	const void* Triangles = TempTriMesh->getTriangles();
+
+	// Grab triangle indices
+	int32 I0, I1, I2;
 
 	float Volume = 0.0f;
 	FVector Center = FVector::ZeroVector;
 
-	if (LODResource)
+	for (int32 TriIndex = 0; TriIndex < TriNumber; ++TriIndex)
 	{
-		// Due to performance I calculate volume only for main mesh group inside model (Section[0]).
-		// If you want to know how to calculate for more then one section see -> UStaticMesh::GetPhysicsTriMeshData
-		FStaticMeshSection& Section = LODResource->Sections[0];
-		FPositionVertexBuffer& PositionVertexBuffer = LODResource->PositionVertexBuffer;
-
-		FIndexArrayView Indices = LODResource->IndexBuffer.GetArrayView();
-
-		uint32 i = Section.FirstIndex;
-		uint32 OnePastLastIndex = Section.FirstIndex + Section.NumTriangles * 3;
-		for (i; i < OnePastLastIndex; i += 3)
+		if (TempTriMesh->getTriangleMeshFlags() & PxTriangleMeshFlag::eHAS_16BIT_TRIANGLE_INDICES)
 		{
-			FVector Vertex1 = PositionVertexBuffer.VertexPosition(Indices[i]);
-			FVector Vertex2 = PositionVertexBuffer.VertexPosition(Indices[i + 1]);
-			FVector Vertex3 = PositionVertexBuffer.VertexPosition(Indices[i + 2]);
-
-
-			Volume += ComputeTetrahedronVolume(Center, FVector::ZeroVector, Vertex1, Vertex2, Vertex3);
+			PxU16* P16BitIndices = (PxU16*)Triangles;
+			I0 = P16BitIndices[(TriIndex * 3) + 0];
+			I1 = P16BitIndices[(TriIndex * 3) + 1];
+			I2 = P16BitIndices[(TriIndex * 3) + 2];
 		}
+		else
+		{
+			PxU32* P32BitIndices = (PxU32*)Triangles;
+			I0 = P32BitIndices[(TriIndex * 3) + 0];
+			I1 = P32BitIndices[(TriIndex * 3) + 1];
+			I2 = P32BitIndices[(TriIndex * 3) + 2];
+		}
+
+		const FVector V0 = P2UVector(PVertices[I0]);
+		const FVector V1 = P2UVector(PVertices[I1]);
+		const FVector V2 = P2UVector(PVertices[I2]);
+
+		Volume += ComputeTetrahedronVolume(Center, FVector::ZeroVector, V0, V1, V2);
 	}
 
 	VolumeCentroid = Center;
@@ -61,13 +75,6 @@ void UBuoyancyHelper::ComputeBuoyancy(AOceanManager* OceanManager,  UStaticMeshC
 		return;
 	}
 
-	if (BuoyantMesh->StaticMesh->RenderData->LODResources.Num() <= 0)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Buoyant mesh has no LOD Resources!");
-
-		return;
-	}
-
 	if (!OceanManager)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Ocean manager is NULL!");
@@ -79,9 +86,9 @@ void UBuoyancyHelper::ComputeBuoyancy(AOceanManager* OceanManager,  UStaticMeshC
 	float SubmergedVolume = ComputeSubmergedVolume(OceanManager, BuoyantMesh, SubmergedCentroid, BuoyantData);
 
 	// @TODO: Move to actor tick and add local center offset to BuoyantData
-	DrawDebugSphere(BuoyantMesh->GetWorld(), SubmergedCentroid, 8.0f, 8, FColor::Blue);
+	//DrawDebugSphere(BuoyantMesh->GetWorld(), SubmergedCentroid, 8.0f, 8, FColor::Blue);
 
-	if (SubmergedVolume < 0)
+	if (SubmergedVolume > 0)
 	{
 		const float WaterDensity = 0.0001f; // 1g/cm^3 -> 1000kg/m^3
 		const float WaterLinearDrag = 50000.0f;
@@ -95,7 +102,7 @@ void UBuoyancyHelper::ComputeBuoyancy(AOceanManager* OceanManager,  UStaticMeshC
 		/* You can use this crazy version, but I prefer one above since it gives us 2 variables we can control (and it dosen't have 10 freaking zeros ;) ) */
 		//float VolumeMass = FMath::Abs((BuoyantData.DensityOfBody * 0.00000000001f * BuoyantData.BodyVolume) * 0.5f);
 
-		FVector BuoyantForce = (WaterDensity * SubmergedVolume * BuoyantMesh->GetWorld()->GetGravityZ()) * PlaneNormal;
+		FVector BuoyantForce = (WaterDensity * SubmergedVolume * -BuoyantMesh->GetWorld()->GetGravityZ()) * PlaneNormal;
 		float PartialMass = VolumeMass * SubmergedVolume / BuoyantData.BodyVolume;
 		FVector Rc = SubmergedCentroid - BuoyantMesh->GetCenterOfMass();
 		FVector Vc = BuoyantMesh->GetPhysicsLinearVelocity() + FVector::CrossProduct((BuoyantMesh->GetPhysicsAngularVelocity() * 0.0001f), Rc);
@@ -171,6 +178,16 @@ float UBuoyancyHelper::ClipTriangle(FVector& Center, FVector Point, FVector Vert
 
 float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FVector& Centroid, FBuoyantBodyData& BuoyantData)
 {
+	PxTriangleMesh* TempTriMesh = BuoyantMesh->BodyInstance.BodySetup.Get()->TriMesh;
+
+	if (TempTriMesh->getNbTriangles() <= 0)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "Mesh has 0 triangles!");
+
+		return 0.0f;
+	}
+	
+
 	 //Temp units simulating Plane, exchange with DynamicWater data when 'Best fit plane' ready
 	FVector PlaneNormal = FVector::UpVector;
 	FVector PlaneLocation = FVector::ZeroVector;
@@ -182,21 +199,19 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 	float Offset = PlaneLocation.Z - FVector::DotProduct(PlaneNormal, BuoyantMesh->GetCenterOfMass());
 
 	float TINY_DEPTH = -1e-6f;
-	
-	FStaticMeshLODResources* LODResource = &BuoyantMesh->StaticMesh->RenderData->LODResources[0];
-	FStaticMeshSection& Section = LODResource->Sections[0];
-	FPositionVertexBuffer& PositionVertexBuffer = LODResource->PositionVertexBuffer;
 
 	TArray<float> Ds;
-	Ds.AddUninitialized(Section.MaxVertexIndex + 1);
+	Ds.AddUninitialized(TempTriMesh->getNbVertices());
 
 	uint32 NumSubmerged = 0;
 	uint32 SampleVertex = 0;
 
+	const PxVec3* PVertices = TempTriMesh->getVertices();
+
 	int32 i = 0;
 	for (i; i < Ds.Num(); ++i)
 	{
-		Ds[i] = FVector::DotProduct(Normal, PositionVertexBuffer.VertexPosition(i)) - Offset;
+		Ds[i] = FVector::DotProduct(Normal, P2UVector(PVertices[i]) ) - Offset;
 		
 		if (Ds[i] < TINY_DEPTH)
 		{
@@ -214,25 +229,42 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 	}
 
 	/* Find a point on the water surface. */
-	FVector Point = PositionVertexBuffer.VertexPosition(SampleVertex) - Ds[SampleVertex] * Normal;
+	FVector Point = P2UVector(PVertices[SampleVertex]) - Ds[SampleVertex] * Normal;
 
 	float Volume = 0.0f;
 	Centroid = FVector::ZeroVector;
 
-	FIndexArrayView Indices = LODResource->IndexBuffer.GetArrayView();
+	int32 TriNumber = TempTriMesh->getNbTriangles();
+	const void* Triangles = TempTriMesh->getTriangles();
 
-	uint32 j = Section.FirstIndex;
-	uint32 OnePastLastIndex = Section.FirstIndex + Section.NumTriangles * 3;
-	for (j; j < OnePastLastIndex; j += 3)
+	// Grab triangle indices
+	int32 I0, I1, I2;
+
+	for (int32 TriIndex = 0; TriIndex < TriNumber; ++TriIndex)
 	{
-		FVector Vertex1 = PositionVertexBuffer.VertexPosition(Indices[j]);
-		float Depth1 = Ds[Indices[j]];
+		if (TempTriMesh->getTriangleMeshFlags() & PxTriangleMeshFlag::eHAS_16BIT_TRIANGLE_INDICES)
+		{
+			PxU16* P16BitIndices = (PxU16*)Triangles;
+			I0 = P16BitIndices[(TriIndex * 3) + 0];
+			I1 = P16BitIndices[(TriIndex * 3) + 1];
+			I2 = P16BitIndices[(TriIndex * 3) + 2];
+		}
+		else
+		{
+			PxU32* P32BitIndices = (PxU32*)Triangles;
+			I0 = P32BitIndices[(TriIndex * 3) + 0];
+			I1 = P32BitIndices[(TriIndex * 3) + 1];
+			I2 = P32BitIndices[(TriIndex * 3) + 2];
+		}
 
-		FVector Vertex2 = PositionVertexBuffer.VertexPosition(Indices[j + 1]);
-		float Depth2 = Ds[Indices[j + 1]];
+		FVector Vertex1 = P2UVector(PVertices[I0]);
+		float Depth1 = Ds[I0];
 
-		FVector Vertex3 = PositionVertexBuffer.VertexPosition(Indices[j + 2]);
-		float Depth3 = Ds[Indices[j + 2]];
+		FVector Vertex2 = P2UVector(PVertices[I1]);
+		float Depth2 = Ds[I1];
+
+		FVector Vertex3 = P2UVector(PVertices[I2]);
+		float Depth3 = Ds[I2];
 
 		if (Depth1 * Depth2 < 0.0f)
 		{
@@ -253,8 +285,8 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 	}
 
 
-	float TINY_VOLUME = -1e-6f;
-	if (Volume >= TINY_VOLUME)
+	float TINY_VOLUME = 1e-6f;
+	if (Volume <= TINY_VOLUME)
 	{
 		Centroid = FVector::ZeroVector;
 		return 0.0f;
@@ -276,15 +308,19 @@ FClippingPlane UBuoyancyHelper::ClaculateClippingPlane(AOceanManager* OceanManag
 	return ClippingPlane;
 }
 
-void UBuoyancyHelper::GetTransformedTestPoints(AOceanManager* OcanManager, UStaticMeshComponent* BuoyantMesh, TArray<FVector>& ClippingPoints, FBuoyantBodyData& BuoyantData)
+void UBuoyancyHelper::GetTransformedTestPoints(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, TArray<FVector>& ClippingPoints, FBuoyantBodyData& BuoyantData)
 {
 	int32 i = 0;
-	for (i; i < ClippingPoints.Num(); ++i)
+	for (i; i < BuoyantData.ClippingPointsOffsets.Num(); ++i)
 	{
-		ClippingPoints[i] += BuoyantMesh->GetComponentLocation();
+		FVector ClippingPoint = BuoyantMesh->GetComponentLocation() + BuoyantData.ClippingPointsOffsets[i];
 
-		ClippingPoints[i] = BuoyantMesh->GetComponentRotation().RotateVector(ClippingPoints[i] - BuoyantMesh->GetComponentLocation()) + BuoyantMesh->GetComponentLocation();
+		ClippingPoint = BuoyantMesh->GetComponentRotation().RotateVector(ClippingPoint - BuoyantMesh->GetComponentLocation()) + BuoyantMesh->GetComponentLocation();
+		ClippingPoint.Z = OceanManager->GetWaveHeight(ClippingPoint, OceanManager->GetWorld()->GetTimeSeconds()).Z;
 
-		DrawDebugSphere(BuoyantMesh->GetWorld(), ClippingPoints[i], 50.0f, 16, FColor::Red);
+		//@FIXME: There is still problem when Mesh is rotated 90*
+		ClippingPoints.Add(ClippingPoint);
+
+		DrawDebugSphere(BuoyantMesh->GetWorld(), ClippingPoint, 16.0f, 8, FColor::Red);
 	}
 }
