@@ -300,10 +300,22 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 
 FClippingPlane UBuoyancyHelper::ClaculateClippingPlane(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData)
 {
-	TArray<FVector> CurrentClippingPoints = BuoyantData.ClippingPointsOffsets;
-	GetTransformedTestPoints(OceanManager, BuoyantMesh, CurrentClippingPoints, BuoyantData);
+	TArray<FVector> ClippingPoints = BuoyantData.ClippingPointsOffsets;
+	GetTransformedTestPoints(OceanManager, BuoyantMesh, ClippingPoints, BuoyantData);
 
 	FClippingPlane ClippingPlane;
+
+
+	// Calculate LLSQ Plane - it is not implemented
+	FVector Sum = FVector::ZeroVector;
+
+	int32 i = 0;
+	for (i; i < ClippingPoints.Num(); ++i)
+	{
+		Sum += ClippingPoints[i];
+	}
+
+	FVector Centroid = Sum * (1.0f / ClippingPoints.Num());
 
 	return ClippingPlane;
 }
@@ -318,9 +330,9 @@ void UBuoyancyHelper::GetTransformedTestPoints(AOceanManager* OceanManager, USta
 		ClippingPoint = BuoyantMesh->GetComponentRotation().RotateVector(ClippingPoint - BuoyantMesh->GetComponentLocation()) + BuoyantMesh->GetComponentLocation();
 		ClippingPoint.Z = OceanManager->GetWaveHeight(ClippingPoint, OceanManager->GetWorld()->GetTimeSeconds()).Z;
 
-		//@FIXME: There is still problem when Mesh is rotated 90*
+		//@FIXME: There is still problem when Mesh is rotated 90* on X or Y axis
 		ClippingPoints.Add(ClippingPoint);
 
-		DrawDebugSphere(BuoyantMesh->GetWorld(), ClippingPoint, 16.0f, 8, FColor::Red);
+		//DrawDebugSphere(BuoyantMesh->GetWorld(), ClippingPoint, 16.0f, 8, FColor::Red);
 	}
 }
