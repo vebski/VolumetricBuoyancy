@@ -42,7 +42,7 @@ private:
 	*	@param BuoyantMesh				Mesh for calculation
 	*	@param Centroid		(out)		Center of calculated volume
 	*/
-	static float ComputeSubmergedVolume(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FVector& Centroid, FBuoyantBodyData& BuoyantData);
+	static float ComputeSubmergedVolume(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FClippingPlane& ClippingPlane, FVector& Centroid, FBuoyantBodyData& BuoyantData);
 
 	static FClippingPlane ClaculateClippingPlane(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData);
 
@@ -52,4 +52,11 @@ private:
 	*	@param ClippingPoints	(out)	Calculated clipping points
 	*/
 	static void GetTransformedTestPoints(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, TArray<FVector>& ClippingPoints, FBuoyantBodyData& BuoyantData);
+
+	static FVector FindEigenVector(FMatrix Matrix);
+
+	static float FindLargestEntry(FMatrix Matrix);
+
+	// @TODO: Move to MathExtension
+	static FVector MatMulVec(FMatrix Matrix, FVector Vector);
 };

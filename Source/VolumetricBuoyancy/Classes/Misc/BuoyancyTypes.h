@@ -55,7 +55,7 @@ struct FClippingPlane
 
 	FClippingPlane()
 	{
-		PlaneNormal = FVector::ZeroVector;
+		PlaneNormal = FVector::UpVector;
 		PlaneLocation = FVector::ZeroVector;
 	}
 };

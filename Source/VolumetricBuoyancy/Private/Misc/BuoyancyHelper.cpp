@@ -26,6 +26,8 @@ float UBuoyancyHelper::ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FV
 	}
 
 	int32 TriNumber = TempTriMesh->getNbTriangles();
+	
+	
 
 	const PxVec3* PVertices = TempTriMesh->getVertices();
 	const void* Triangles = TempTriMesh->getTriangles();
@@ -83,7 +85,8 @@ void UBuoyancyHelper::ComputeBuoyancy(AOceanManager* OceanManager,  UStaticMeshC
 	}
 
 	FVector SubmergedCentroid = FVector::ZeroVector;
-	float SubmergedVolume = ComputeSubmergedVolume(OceanManager, BuoyantMesh, SubmergedCentroid, BuoyantData);
+	FClippingPlane ClippingPlane;
+	float SubmergedVolume = ComputeSubmergedVolume(OceanManager, BuoyantMesh, ClippingPlane, SubmergedCentroid, BuoyantData);
 
 	// @TODO: Move to actor tick and add local center offset to BuoyantData
 	//DrawDebugSphere(BuoyantMesh->GetWorld(), SubmergedCentroid, 8.0f, 8, FColor::Blue);
@@ -95,7 +98,7 @@ void UBuoyancyHelper::ComputeBuoyancy(AOceanManager* OceanManager,  UStaticMeshC
 		const float WaterAngularDrag = 500.0f;
 		const FVector WaterVelocity = FVector::ZeroVector;
 		const FVector PlaneNormal = FVector::UpVector;
-		const FVector PlaneLocation = FVector::ZeroVector;
+		const FVector PlaneLocation = ClippingPlane.PlaneLocation;// FVector::ZeroVector;
 
 		float VolumeMass = (BuoyantData.DensityOfBody * 0.0000001f) * BuoyantMesh->GetMass();
 
@@ -176,7 +179,7 @@ float UBuoyancyHelper::ClipTriangle(FVector& Center, FVector Point, FVector Vert
 	return Volume;
 }
 
-float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FVector& Centroid, FBuoyantBodyData& BuoyantData)
+float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FClippingPlane& ClippingPlane, FVector& Centroid, FBuoyantBodyData& BuoyantData)
 {
 	PxTriangleMesh* TempTriMesh = BuoyantMesh->BodyInstance.BodySetup.Get()->TriMesh;
 
@@ -186,17 +189,18 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 
 		return 0.0f;
 	}
+
 	
-
-	 //Temp units simulating Plane, exchange with DynamicWater data when 'Best fit plane' ready
-	FVector PlaneNormal = FVector::UpVector;
-	FVector PlaneLocation = FVector::ZeroVector;
-
-	FClippingPlane ClippingPlane = ClaculateClippingPlane(OceanManager, BuoyantMesh, BuoyantData);
+	//ClippingPlane = ClaculateClippingPlane(OceanManager, BuoyantMesh, BuoyantData); 
+	//ClippingPlane.PlaneLocation = FVector::ZeroVector;
+	//ClippingPlane.PlaneNormal = FVector::UpVector;
+	
+	//DrawDebugSphere(BuoyantMesh->GetWorld(), ClippingPlane.PlaneLocation, 32.0f, 8, FColor::Yellow);
+	//DrawDebugDirectionalArrow(BuoyantMesh->GetWorld(), ClippingPlane.PlaneLocation, ClippingPlane.PlaneLocation + (ClippingPlane.PlaneNormal * 25.0f), 8.0f, FColor::Yellow);
 
 	FQuat Qt = BuoyantMesh->GetComponentRotation().Quaternion().Inverse();
-	FVector Normal = Qt.RotateVector(PlaneNormal);
-	float Offset = PlaneLocation.Z - FVector::DotProduct(PlaneNormal, BuoyantMesh->GetCenterOfMass());
+	FVector Normal = Qt.RotateVector(ClippingPlane.PlaneNormal);
+	float Offset = ClippingPlane.PlaneLocation.Z - FVector::DotProduct(ClippingPlane.PlaneNormal, BuoyantMesh->GetCenterOfMass());
 
 	float TINY_DEPTH = -1e-6f;
 
@@ -208,10 +212,14 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 
 	const PxVec3* PVertices = TempTriMesh->getVertices();
 
+	const FTransform RV_Transform = BuoyantMesh->GetComponentTransform();
+
 	int32 i = 0;
 	for (i; i < Ds.Num(); ++i)
 	{
-		Ds[i] = FVector::DotProduct(Normal, P2UVector(PVertices[i]) ) - Offset;
+		// LLSQ is Ready (returns correct Centroid and Normal) but applying it to buoyancy gives unrealistic results for now.
+		// So instead I use offsets based on WaveHeight for each Vertex. This solution is about x3 slower then LLSQ.
+		Ds[i] = FVector::DotProduct(Normal, P2UVector(PVertices[i])) - (OceanManager->GetWaveHeight(RV_Transform.TransformPosition(P2UVector(PVertices[i])), OceanManager->GetWorld()->GetTimeSeconds()).Z - FVector::DotProduct(ClippingPlane.PlaneNormal, BuoyantMesh->GetCenterOfMass()));
 		
 		if (Ds[i] < TINY_DEPTH)
 		{
@@ -300,7 +308,7 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 
 FClippingPlane UBuoyancyHelper::ClaculateClippingPlane(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FBuoyantBodyData& BuoyantData)
 {
-	TArray<FVector> ClippingPoints = BuoyantData.ClippingPointsOffsets;
+	TArray<FVector> ClippingPoints;
 	GetTransformedTestPoints(OceanManager, BuoyantMesh, ClippingPoints, BuoyantData);
 
 	FClippingPlane ClippingPlane;
@@ -309,6 +317,7 @@ FClippingPlane UBuoyancyHelper::ClaculateClippingPlane(AOceanManager* OceanManag
 	// Calculate LLSQ Plane - it is not implemented
 	FVector Sum = FVector::ZeroVector;
 
+	// Find Plane Centroid
 	int32 i = 0;
 	for (i; i < ClippingPoints.Num(); ++i)
 	{
@@ -317,7 +326,98 @@ FClippingPlane UBuoyancyHelper::ClaculateClippingPlane(AOceanManager* OceanManag
 
 	FVector Centroid = Sum * (1.0f / ClippingPoints.Num());
 
+	// Set Plane Location
+	ClippingPlane.PlaneLocation = Centroid;
+
+	FVector PlaneNormal = FVector::ZeroVector;
+
+	float SumXX = 0.0f, SumXY = 0.0f, SumXZ = 0.0f;
+	float SumYY = 0.0f, SumYZ = 0.0f;
+	float SumZZ = 0.0f;
+
+	// Find Plane Normal
+	i = 0;
+	for (i; i < ClippingPoints.Num(); ++i)
+	{
+		float DiffX = ClippingPoints[i].X - Centroid.X;
+		float DiffY = ClippingPoints[i].Y - Centroid.Y;
+		float DiffZ = ClippingPoints[i].Z - Centroid.Z;
+
+		SumXX += DiffX * DiffX;
+		SumXY += DiffX * DiffY;
+		SumXZ += DiffX * DiffZ;
+
+		SumYY += DiffY * DiffY;
+		SumYZ += DiffY * DiffZ;
+
+		SumZZ += DiffZ * DiffZ;
+	}
+
+	FMatrix Matrix = FMatrix(FVector(SumXX, SumXY, SumXZ),
+							 FVector(SumXY, SumYY, SumYZ),
+							 FVector(SumXZ, SumYZ, SumZZ),
+							 FVector(0, 0, 0));
+
+	float Determinant = Matrix.Determinant();
+
+	if (Determinant == 0.0f)
+	{
+		// @TODO: Implement Matrix GetNullSpace
+
+		//m.GetNullSpace(destNormal,NULL,NULL);
+
+		return ClippingPlane;
+	}
+
+
+	ClippingPlane.PlaneNormal = FindEigenVector(Matrix.Inverse());
+
 	return ClippingPlane;
+}
+
+FVector UBuoyancyHelper::FindEigenVector(FMatrix Matrix)
+{
+	float Scale = FindLargestEntry(Matrix);
+
+	FMatrix MatrixC = Matrix * (1.0f / Scale);
+	
+	MatrixC = MatrixC * MatrixC;
+	MatrixC = MatrixC * MatrixC;
+	MatrixC = MatrixC * MatrixC;
+
+	FVector V = FVector(1.0f, 1.0f, 1.0f);
+	FVector LastV = V;
+
+	for (int32 i = 0; i < 100; ++i)
+	{
+		V = MatMulVec(MatrixC, V).GetSafeNormal();
+		
+		if (FVector::DistSquared(V, LastV) < 1e-16f)
+		{
+			break;
+		}
+
+		LastV = V;
+	}
+
+	return V;
+}
+
+float UBuoyancyHelper::FindLargestEntry(FMatrix Matrix)
+{
+	float LargestValue = 0.0f;
+
+	for (int32 i = 0; i < 3; ++i)
+	{
+		for (int32 j = 0; j < 3; ++j)
+		{
+			float Entry = FMath::Abs(Matrix.M[i][j]);
+
+			LargestValue = FMath::Max(Entry, LargestValue);
+		}
+	}
+
+	return LargestValue;
 }
 
 void UBuoyancyHelper::GetTransformedTestPoints(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, TArray<FVector>& ClippingPoints, FBuoyantBodyData& BuoyantData)
@@ -330,9 +430,29 @@ void UBuoyancyHelper::GetTransformedTestPoints(AOceanManager* OceanManager, USta
 		ClippingPoint = BuoyantMesh->GetComponentRotation().RotateVector(ClippingPoint - BuoyantMesh->GetComponentLocation()) + BuoyantMesh->GetComponentLocation();
 		ClippingPoint.Z = OceanManager->GetWaveHeight(ClippingPoint, OceanManager->GetWorld()->GetTimeSeconds()).Z;
 
-		//@FIXME: There is still problem when Mesh is rotated 90* on X or Y axis
+		//@FIXME: There is still a problem when Mesh is rotated 90* on X or Y axis
 		ClippingPoints.Add(ClippingPoint);
 
 		//DrawDebugSphere(BuoyantMesh->GetWorld(), ClippingPoint, 16.0f, 8, FColor::Red);
 	}
 }
+
+FVector UBuoyancyHelper::MatMulVec(FMatrix Matrix, FVector Vector)
+{
+	FVector Result = FVector::ZeroVector;
+
+	for (int32 i = 0; i < 3; ++i)
+	{
+		for (int32 j = 0; j < 3; ++j)
+		{
+			
+			Result[i] += (Matrix.M[i][j] * Vector[j]);
+		}
+	}
+
+	return Result;
+}
+
+
+
+

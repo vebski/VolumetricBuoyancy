@@ -54,10 +54,10 @@ FVector AOceanManager::CalculateGerstnerWaveCluser(float MedianaWaveLength, floa
 FVector AOceanManager::GetWaveHeight(FVector Location, float Time)
 {
 	FVector Sum = FVector(0, 0, 0);
-
+	// 50 / 20
 	// @FIXME: First 2 values for waveLength and Amplitude should be Read from Material in BP
-	Sum += CalculateGerstnerWaveCluser(2500, 50, FVector2D(Location.X, Location.Y), FVector2D(0, 1), 0.5f, Time);
-	Sum += CalculateGerstnerWaveCluser(1000, 20, FVector2D(Location.X, Location.Y), FVector2D(0, 1), 0.5f, Time);
+	Sum += CalculateGerstnerWaveCluser(2500, 200, FVector2D(Location.X, Location.Y), FVector2D(0, 1), 0.5f, Time);
+	Sum += CalculateGerstnerWaveCluser(1000, 115, FVector2D(Location.X, Location.Y), FVector2D(0, 1), 0.5f, Time);
 
 	return Sum / 2;
 }
