@@ -97,7 +97,7 @@ void UBuoyancyHelper::ComputeBuoyancy(AOceanManager* OceanManager,  UStaticMeshC
 		const float WaterLinearDrag = 50000.0f;
 		const float WaterAngularDrag = 500.0f;
 		const FVector WaterVelocity = FVector::ZeroVector;
-		const FVector PlaneNormal = FVector::UpVector;
+		const FVector PlaneNormal = FVector::UpVector;//ClippingPlane.PlaneNormal;
 		const FVector PlaneLocation = ClippingPlane.PlaneLocation;// FVector::ZeroVector;
 
 		float VolumeMass = (BuoyantData.DensityOfBody * 0.0000001f) * BuoyantMesh->GetMass();
@@ -191,7 +191,7 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 	}
 
 	
-	//ClippingPlane = ClaculateClippingPlane(OceanManager, BuoyantMesh, BuoyantData); 
+	ClippingPlane = ClaculateClippingPlane(OceanManager, BuoyantMesh, BuoyantData); 
 	//ClippingPlane.PlaneLocation = FVector::ZeroVector;
 	//ClippingPlane.PlaneNormal = FVector::UpVector;
 	
@@ -200,7 +200,7 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 
 	FQuat Qt = BuoyantMesh->GetComponentRotation().Quaternion().Inverse();
 	FVector Normal = Qt.RotateVector(ClippingPlane.PlaneNormal);
-	float Offset = ClippingPlane.PlaneLocation.Z - FVector::DotProduct(ClippingPlane.PlaneNormal, BuoyantMesh->GetCenterOfMass());
+	float Offset = ClippingPlane.PlaneLocation.Z - FVector::DotProduct(FVector::UpVector, BuoyantMesh->GetCenterOfMass());
 
 	float TINY_DEPTH = -1e-6f;
 
@@ -219,7 +219,7 @@ float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStat
 	{
 		// LLSQ is Ready (returns correct Centroid and Normal) but applying it to buoyancy gives unrealistic results for now.
 		// So instead I use offsets based on WaveHeight for each Vertex. This solution is about x3 slower then LLSQ.
-		Ds[i] = FVector::DotProduct(Normal, P2UVector(PVertices[i])) - (OceanManager->GetWaveHeight(RV_Transform.TransformPosition(P2UVector(PVertices[i])), OceanManager->GetWorld()->GetTimeSeconds()).Z - FVector::DotProduct(ClippingPlane.PlaneNormal, BuoyantMesh->GetCenterOfMass()));
+		Ds[i] = FVector::DotProduct(Normal, P2UVector(PVertices[i])) - Offset;// -(OceanManager->GetWaveHeight(RV_Transform.TransformPosition(P2UVector(PVertices[i])), OceanManager->GetWorld()->GetTimeSeconds()).Z - FVector::DotProduct(ClippingPlane.PlaneNormal, BuoyantMesh->GetCenterOfMass()));
 		
 		if (Ds[i] < TINY_DEPTH)
 		{
