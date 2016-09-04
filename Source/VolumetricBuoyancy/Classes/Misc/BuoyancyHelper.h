@@ -22,7 +22,7 @@ public:
 	 *	@param BuoyantMesh				Mesh for calculation
 	 *	@param VolumeCentroid (out)		Center of calculated volume
 	 */
-	static float ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FVector& VolumeCentroid);
+	static float ComputeVolume(UStaticMeshComponent* BuoyantMesh, FVector& VolumeCentroid);
 
 	/* Calculate and apply buoyancy
 	*	@param OceanManager				Current ocean manager on level

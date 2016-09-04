@@ -2,12 +2,14 @@
 
 #include "VolumetricBuoyancy.h"
 #include "PhysicsPublic.h"
+#include "PhysxPublic.h"
+#include "PhysicsEngine/BodySetup.h"
 #include "PhysXIncludes.h"
 #include "ThirdParty/PhysX/PhysX-3.3/include/geometry/PxTriangleMesh.h"
 #include "ThirdParty/PhysX/PhysX-3.3/include/foundation/PxSimpleTypes.h"
 #include "Misc/BuoyancyHelper.h"
 
-float UBuoyancyHelper::ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FVector& VolumeCentroid)
+float UBuoyancyHelper::ComputeVolume(UStaticMeshComponent* BuoyantMesh, FVector& VolumeCentroid)
 {
 	if (!BuoyantMesh || !BuoyantMesh->StaticMesh || !BuoyantMesh->StaticMesh->RenderData)
 	{
@@ -16,7 +18,18 @@ float UBuoyancyHelper::ComputeVolume(const UStaticMeshComponent* BuoyantMesh, FV
 		return 0.0f;
 	}
 
-	PxTriangleMesh* TempTriMesh = BuoyantMesh->BodyInstance.BodySetup.Get()->TriMesh;
+	PxTriangleMesh* TempTriMesh = nullptr;
+	if (BuoyantMesh->GetBodySetup()->TriMeshes.Num() > 0)
+	{
+		TempTriMesh = BuoyantMesh->GetBodySetup()->TriMeshes[0];
+	}
+
+	if (TempTriMesh == nullptr)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "No TriMesh data!");
+
+		return 0.0f;
+	}
 
 	if (TempTriMesh->getNbTriangles() <= 0)
 	{
@@ -181,7 +194,20 @@ float UBuoyancyHelper::ClipTriangle(FVector& Center, FVector Point, FVector Vert
 
 float UBuoyancyHelper::ComputeSubmergedVolume(AOceanManager* OceanManager, UStaticMeshComponent* BuoyantMesh, FClippingPlane& ClippingPlane, FVector& Centroid, FBuoyantBodyData& BuoyantData)
 {
-	PxTriangleMesh* TempTriMesh = BuoyantMesh->BodyInstance.BodySetup.Get()->TriMesh;
+	PxTriangleMesh* TempTriMesh = nullptr;
+
+	if (BuoyantMesh->GetBodySetup()->TriMeshes.Num() > 0)
+	{
+		TempTriMesh = BuoyantMesh->GetBodySetup()->TriMeshes[0];
+	}
+
+
+	if (TempTriMesh == nullptr)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, "No TriMesh data!");
+
+		return 0.0f;
+	}
 
 	if (TempTriMesh->getNbTriangles() <= 0)
 	{
